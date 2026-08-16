@@ -259,6 +259,23 @@ learnings ingest drafts.json --apply       # 4. writes only the NEW ones
 Ingest is **dry-run by default** and dedups every entry against the existing corpus, so
 a bad batch can't silently pollute the knowledge base.
 
+## Mine past sessions for learnings (`/mine-project`)
+
+The other half of onboarding: `ingest` mines what's *written down* (runbooks/docs); this
+mines what you *figured out in past Claude sessions*. Claude Code stores every session
+transcript keyed by the directory you ran it in, so a project's history is already scoped.
+
+- **`learnings transcripts [dir]`** — list that directory's past sessions (date, id, first
+  message); add `--show <session-id>` to print a condensed, readable version of one.
+- **`/mine-project [dir]`** — a slash command that runs the interactive flow: Claude lists
+  the sessions, you pick one, it extracts candidate learnings (applying the
+  can-I-google-it test) and walks them **one at a time** — *"Found: … Include? (yes/no/edit)"* —
+  saving the ones you approve, with dedup and provenance back to the source session.
+
+The condense/list step is deterministic (no LLM); the drafting happens inside your Claude
+session (no API key, on your subscription). `bootstrap.sh` installs the slash command and a
+global `learnings` shim.
+
 ## Eval harness
 
 ```bash

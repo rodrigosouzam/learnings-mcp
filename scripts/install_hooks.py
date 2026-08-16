@@ -50,6 +50,15 @@ def main():
     else:
         print(f"CLAUDE.md rules already present ({cm})")
 
+    # ---- slash commands (e.g. /mine-project) ----
+    cmd_src = repo / "commands"
+    if cmd_src.exists():
+        cmd_dst = cdir / "commands"
+        cmd_dst.mkdir(parents=True, exist_ok=True)
+        for md in cmd_src.glob("*.md"):
+            (cmd_dst / md.name).write_text(md.read_text())
+            print(f"+ /{md.stem} command")
+
 
 if __name__ == "__main__":
     main()

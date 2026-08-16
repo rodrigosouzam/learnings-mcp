@@ -109,6 +109,10 @@ def main(argv=None) -> int:
     p_eval = sub.add_parser("eval", help="run the retrieval eval harness")
     p_eval.add_argument("file", nargs="?")
 
+    p_tx = sub.add_parser("transcripts", help="list/condense Claude session transcripts for a dir")
+    p_tx.add_argument("dir", nargs="?", default=".")
+    p_tx.add_argument("--show", metavar="SESSION", help="print the condensed transcript for a session id")
+
     p_exp = sub.add_parser("export", help="export learnings to a git repo of markdown files")
     p_exp.add_argument("dir", nargs="?")
     p_imp = sub.add_parser("import", help="import/upsert learnings from the repo")
@@ -188,6 +192,19 @@ def main(argv=None) -> int:
     if args.cmd == "eval":
         from .evaluate import load_cases, run, format_report
         print(format_report(run(load_cases(args.file))))
+        return 0
+
+    if args.cmd == "transcripts":
+        from .transcripts import list_sessions, condense
+        if args.show:
+            text = condense(args.dir, args.show)
+            print(text if text is not None else f"no transcript {args.show} for {args.dir}")
+        else:
+            rows = list_sessions(args.dir)
+            if not rows:
+                print(f"no Claude transcripts found for {args.dir}")
+            for r in rows:
+                print(f"{r['when']}  {r['session']}  ({r['messages']} msgs, {r['kb']} KB)\n    {r['title']}")
         return 0
 
     if args.cmd == "export":

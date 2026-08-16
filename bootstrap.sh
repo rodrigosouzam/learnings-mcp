@@ -29,7 +29,10 @@ command -v python3 >/dev/null || { echo "!! python3 not found (apt install pytho
 [ -x "$PY" ] || python3 -m venv "$REPO_DIR/.venv"
 "$REPO_DIR/.venv/bin/pip" install -q --upgrade pip
 "$REPO_DIR/.venv/bin/pip" install -q -e "$REPO_DIR"
-echo "==> installed"
+# Make `learnings` globally callable (used by the /mine-project slash command).
+mkdir -p "$HOME/.local/bin"
+ln -sf "$REPO_DIR/.venv/bin/learnings" "$HOME/.local/bin/learnings"
+echo "==> installed (learnings CLI → ~/.local/bin/learnings)"
 
 # 2. Import an existing knowledge repo (optional — the 'unified' path)
 if [ -n "$KNOWLEDGE_REPO" ]; then
