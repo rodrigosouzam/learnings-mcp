@@ -62,6 +62,12 @@ def _workspaces(store):
     return [{"name": r["workspace"], "count": r["n"], "core": r["c"] or 0} for r in rows]
 
 
+def _mappings():
+    """Directory → workspace map from ~/.learnings/workspaces.txt (or LEARNINGS_WORKSPACES)."""
+    from .workspace import _roots_map
+    return [{"dir": k, "workspace": v} for k, v in sorted(_roots_map().items())]
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *a):  # quiet
         pass
@@ -95,7 +101,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/api/state":
                 return self._send(200, {"workspaces": _workspaces(store), "core_cap": CORE_CAP,
-                                        "stats": _stats(store)})
+                                        "stats": _stats(store), "mappings": _mappings()})
             if u.path == "/api/learnings":
                 qs = parse_qs(u.query)
                 ws = (qs.get("workspace") or ["all"])[0]
@@ -231,11 +237,12 @@ button:hover{border-color:var(--acc)}button.pri{background:var(--acc);color:#fff
 .content a.lnk{color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--acc)}
 .stats{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);font-size:12px;line-height:1.8}
 .stats b{color:var(--fg);font-weight:600}
+.mrow{padding:2px 0}.mrow code{font-size:11px;background:var(--panel2);padding:1px 4px;border-radius:4px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
 .modal.on{display:flex}.dlg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,92vw);display:flex;flex-direction:column;gap:10px}
 .dlg input,.dlg textarea{width:100%}.dist{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
 </style></head><body><div class="app">
-<div class="side"><h1>📓 Learnings</h1><div id="wsList"></div><div class="stats" id="stats"></div></div>
+<div class="side"><h1>📓 Learnings</h1><div id="wsList"></div><div class="stats" id="stats"></div><div class="stats" id="maps"></div></div>
 <div class="main">
   <div class="bar">
     <input id="q" placeholder="Filter or search…" autocomplete="off">
@@ -269,7 +276,11 @@ async function loadState(){const s=await api('/api/state');CAP=s.core_cap;
   document.querySelectorAll('.ws').forEach(e=>e.onclick=()=>{WS=e.dataset.w;loadState();load()});
   const st=s.stats||{};
   $('#stats').innerHTML=`<b>${st.total||0}</b> learnings · <b>${st.core||0}</b> core (cap ${CAP})<br>`+
-    `<b>${st.stale||0}</b> stale · <b>${st.cold||0}</b> never used`;}
+    `<b>${st.stale||0}</b> stale · <b>${st.cold||0}</b> never used`;
+  const maps=s.mappings||[];
+  $('#maps').innerHTML = maps.length
+    ? '<b>Folder → workspace</b>'+maps.map(m=>`<div class="mrow"><code>~/${esc(m.dir)}</code> → <b>${esc(m.workspace)}</b></div>`).join('')
+    : '<span style="opacity:.6">no folder mappings<br>(~/.learnings/workspaces.txt)</span>';}
 async function load(){const q=encodeURIComponent($('#q').value.trim());
   let items=await api(`/api/learnings?workspace=${encodeURIComponent(WS)}&mode=${MODE}&q=${q}`);
   if(CORE_ONLY) items=items.filter(r=>r.is_core);
