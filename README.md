@@ -344,5 +344,18 @@ instructions). Override the location per-run with a `dir` arg or `LEARNINGS_SYNC
 
 > Keep the repo **private** — it holds your infra knowledge.
 
-For multi-*user* (a shared team brain), promote to a Postgres + HTTP service (the
-original team design) — the schema and tool contract already map onto it.
+## Sharing across people (team mode)
+
+Two ways to share a project's learnings with teammates — a **scoped git repo** (async,
+zero infra) or a **shared Postgres + pgvector** backend (live, real concurrency). Both
+keep your other workspaces private. The local SQLite store stays the default and is
+unaffected. See **[TEAM.md](TEAM.md)** for the full guide; the short version:
+
+```bash
+# Option A — scoped git sync (share only base + one project)
+learnings sync ~/team-repo --workspace base,acme
+
+# Option B — point the MCP server at a shared Postgres (pip install '.[postgres]')
+docker compose -f deploy/docker-compose.yml up -d
+#   then set LEARNINGS_DB_URL=postgresql://… on each person's MCP server
+```

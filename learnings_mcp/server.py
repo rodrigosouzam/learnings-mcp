@@ -17,18 +17,19 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from .store import Store
+from .backend import get_store
 from .workspace import resolve_workspace
 
 mcp = FastMCP("learnings")
 
-_store: Store | None = None
+_store = None
 
 
-def store() -> Store:
+def store():
+    """The active backend — local SQLite by default, shared Postgres if LEARNINGS_DB_URL is set."""
     global _store
     if _store is None:
-        _store = Store()
+        _store = get_store()
     return _store
 
 

@@ -10,6 +10,10 @@ dependencies = [
     "fastembed>=0.4.2",
 ]
 
+[project.optional-dependencies]
+# Team mode: shared Postgres + pgvector backend (see TEAM.md). Local SQLite needs none of this.
+postgres = ["psycopg[binary]>=3.1"]
+
 [project.scripts]
 learnings-mcp = "learnings_mcp.server:main"
 learnings = "learnings_mcp.cli:main"

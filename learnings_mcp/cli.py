@@ -115,11 +115,14 @@ def main(argv=None) -> int:
 
     p_exp = sub.add_parser("export", help="export learnings to a git repo of markdown files")
     p_exp.add_argument("dir", nargs="?")
+    p_exp.add_argument("--workspace", help="only these workspaces (comma-separated), e.g. base,acme")
     p_imp = sub.add_parser("import", help="import/upsert learnings from the repo")
     p_imp.add_argument("dir", nargs="?")
+    p_imp.add_argument("--workspace", help="only import these workspaces (comma-separated)")
     p_syn = sub.add_parser("sync", help="export → commit → pull --rebase → import → push")
     p_syn.add_argument("dir", nargs="?")
     p_syn.add_argument("-m", "--message", default="learnings sync")
+    p_syn.add_argument("--workspace", help="only sync these workspaces (comma-separated), e.g. base,acme")
 
     p_ui = sub.add_parser("ui", help="launch the local web UI")
     p_ui.add_argument("--port", type=int, default=8765)
@@ -207,18 +210,21 @@ def main(argv=None) -> int:
                 print(f"{r['when']}  {r['session']}  ({r['messages']} msgs, {r['kb']} KB)\n    {r['title']}")
         return 0
 
+    def _wsset(v):
+        return {w.strip() for w in v.split(",") if w.strip()} if v else None
+
     if args.cmd == "export":
         from .sync import export_to_dir, sync_dir
-        n = export_to_dir(args.dir)
+        n = export_to_dir(args.dir, _wsset(args.workspace))
         print(f"exported {n} learnings to {sync_dir(args.dir)}")
         return 0
     if args.cmd == "import":
         from .sync import import_from_dir
-        print(import_from_dir(args.dir))
+        print(import_from_dir(args.dir, _wsset(args.workspace)))
         return 0
     if args.cmd == "sync":
         from .sync import sync
-        print(sync(args.dir, args.message))
+        print(sync(args.dir, args.message, _wsset(args.workspace)))
         return 0
 
     store = Store()
