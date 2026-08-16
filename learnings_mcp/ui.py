@@ -55,17 +55,25 @@ def _stats(store):
     }
 
 
-def _workspaces(store):
-    rows = store.db.execute(
-        "SELECT workspace, COUNT(*) n, SUM(is_core) c FROM learnings GROUP BY workspace ORDER BY workspace"
-    ).fetchall()
-    return [{"name": r["workspace"], "count": r["n"], "core": r["c"] or 0} for r in rows]
-
-
 def _mappings():
     """Directory → workspace map from ~/.learnings/workspaces.txt (or LEARNINGS_WORKSPACES)."""
     from .workspace import _roots_map
     return [{"dir": k, "workspace": v} for k, v in sorted(_roots_map().items())]
+
+
+def _projects(store):
+    """One row per workspace (deduped) — union of workspaces that have learnings and
+    workspaces that folders map to — with counts and the directories that feed each."""
+    db = {r["workspace"]: (r["n"], r["c"] or 0) for r in store.db.execute(
+        "SELECT workspace, COUNT(*) n, SUM(is_core) c FROM learnings GROUP BY workspace").fetchall()}
+    dirs = {}
+    for m in _mappings():
+        dirs.setdefault(m["workspace"], []).append("~/" + m["dir"])
+    out = []
+    for name in sorted(set(db) | set(dirs)):
+        n, c = db.get(name, (0, 0))
+        out.append({"name": name, "count": n, "core": c, "dirs": dirs.get(name, [])})
+    return out
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -100,8 +108,8 @@ class Handler(BaseHTTPRequestHandler):
         store = Store()
         try:
             if u.path == "/api/state":
-                return self._send(200, {"workspaces": _workspaces(store), "core_cap": CORE_CAP,
-                                        "stats": _stats(store), "mappings": _mappings()})
+                return self._send(200, {"projects": _projects(store), "core_cap": CORE_CAP,
+                                        "stats": _stats(store)})
             if u.path == "/api/learnings":
                 qs = parse_qs(u.query)
                 ws = (qs.get("workspace") or ["all"])[0]
@@ -237,12 +245,15 @@ button:hover{border-color:var(--acc)}button.pri{background:var(--acc);color:#fff
 .content a.lnk{color:var(--acc);text-decoration:none;border-bottom:1px dotted var(--acc)}
 .stats{margin-top:14px;padding-top:12px;border-top:1px solid var(--line);color:var(--mut);font-size:12px;line-height:1.8}
 .stats b{color:var(--fg);font-weight:600}
-.mrow{padding:2px 0}.mrow code{font-size:11px;background:var(--panel2);padding:1px 4px;border-radius:4px}
+.wshead{display:none;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+.wshead .wsname{font-weight:600;font-size:15px;margin-right:10px}
+.wshead .wsdirs code{font-size:11px;background:var(--panel2);padding:2px 6px;border-radius:5px;margin-right:5px;color:var(--mut)}
+.wshead .wslbl{color:var(--mut);font-size:11px;margin-right:6px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center}
 .modal.on{display:flex}.dlg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,92vw);display:flex;flex-direction:column;gap:10px}
 .dlg input,.dlg textarea{width:100%}.dist{font-size:11px;color:var(--mut);font-variant-numeric:tabular-nums}
 </style></head><body><div class="app">
-<div class="side"><h1>📓 Learnings</h1><div id="wsList"></div><div class="stats" id="stats"></div><div class="stats" id="maps"></div></div>
+<div class="side"><h1>📓 Learnings</h1><div id="wsList"></div><div class="stats" id="stats"></div></div>
 <div class="main">
   <div class="bar">
     <input id="q" placeholder="Filter or search…" autocomplete="off">
@@ -251,6 +262,7 @@ button:hover{border-color:var(--acc)}button.pri{background:var(--acc);color:#fff
     <button id="backupBtn" title="save a timestamped copy of learnings.db">⇩ Backup</button>
     <button class="pri" id="addBtn">+ Add</button>
   </div>
+  <div id="wsHeader" class="wshead"></div>
   <div class="list" id="list"></div>
 </div></div>
 <div class="modal" id="modal"><div class="dlg">
@@ -264,23 +276,26 @@ button:hover{border-color:var(--acc)}button.pri{background:var(--acc);color:#fff
   <div class="row" style="justify-content:flex-end"><button id="cancel">Cancel</button><button class="pri" id="save">Save</button></div>
 </div></div>
 <script>
-let WS="all", MODE="list", CAP=15, CORE_ONLY=false;
+let WS="all", MODE="list", CAP=15, CORE_ONLY=false, PROJECTS=[];
 const TOKEN=new URLSearchParams(location.search).get('token')||'';
 const $=s=>document.querySelector(s);
 const api=(u,o={})=>{o.headers=Object.assign({'X-Token':TOKEN},o.headers||{});return fetch(u,o).then(r=>r.json());};
-async function loadState(){const s=await api('/api/state');CAP=s.core_cap;
-  const total=s.workspaces.reduce((a,w)=>a+w.count,0);
-  const rows=[{name:'all',count:total,core:''}].concat(s.workspaces);
+async function loadState(){const s=await api('/api/state');CAP=s.core_cap;PROJECTS=s.projects||[];
+  const total=PROJECTS.reduce((a,w)=>a+w.count,0);
+  const rows=[{name:'all',count:total,core:0,dirs:[]}].concat(PROJECTS);
   $('#wsList').innerHTML=rows.map(w=>`<div class="ws ${w.name===WS?'on':''}" data-w="${w.name}">
-    <span>${w.name}</span><span class="n">${w.count}${w.core?` · ★${w.core}`:''}</span></div>`).join('');
+    <span>${esc(w.name)}</span><span class="n">${w.count}${w.core?` · ★${w.core}`:''}</span></div>`).join('');
   document.querySelectorAll('.ws').forEach(e=>e.onclick=()=>{WS=e.dataset.w;loadState();load()});
   const st=s.stats||{};
   $('#stats').innerHTML=`<b>${st.total||0}</b> learnings · <b>${st.core||0}</b> core (cap ${CAP})<br>`+
     `<b>${st.stale||0}</b> stale · <b>${st.cold||0}</b> never used`;
-  const maps=s.mappings||[];
-  $('#maps').innerHTML = maps.length
-    ? '<b>Folder → workspace</b>'+maps.map(m=>`<div class="mrow"><code>~/${esc(m.dir)}</code> → <b>${esc(m.workspace)}</b></div>`).join('')
-    : '<span style="opacity:.6">no folder mappings<br>(~/.learnings/workspaces.txt)</span>';}
+  renderHeader();}
+function renderHeader(){const p=PROJECTS.find(x=>x.name===WS), h=$('#wsHeader');
+  if(WS==='all'||!p){h.style.display='none';h.innerHTML='';return;}
+  h.style.display='block';
+  const dirs=(p.dirs||[]).map(d=>`<code>${esc(d)}</code>`).join(' ');
+  h.innerHTML=`<span class="wsname">${esc(p.name)}</span>`+
+    (dirs?`<span class="wslbl">folders:</span><span class="wsdirs">${dirs}</span>`:'<span class="wslbl">no folder mapping</span>');}
 async function load(){const q=encodeURIComponent($('#q').value.trim());
   let items=await api(`/api/learnings?workspace=${encodeURIComponent(WS)}&mode=${MODE}&q=${q}`);
   if(CORE_ONLY) items=items.filter(r=>r.is_core);
