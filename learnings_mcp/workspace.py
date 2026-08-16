@@ -34,7 +34,7 @@ def _roots_file() -> Path:
 def _roots_map() -> dict:
     """Map {directory-name-under-$HOME: workspace-name}. Each entry is either a bare
     name (folder name == workspace) or 'folder=workspace' to map a directory to a
-    differently-named workspace (e.g. 'CloudAutomation=ansible'). Read from the
+    differently-named workspace (e.g. 'my-repo-dir=myproject'). Read from the
     LEARNINGS_WORKSPACES env (comma-separated) or <db-dir>/workspaces.txt."""
     entries = []
     env = os.environ.get("LEARNINGS_WORKSPACES")
