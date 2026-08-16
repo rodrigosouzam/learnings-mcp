@@ -19,6 +19,41 @@ Claude  <-- stdio/MCP -->  learnings-mcp (Python)
 - **One file of data** at `~/.learnings/learnings.db` (override with `LEARNINGS_DB_PATH`).
 - **Secret redaction** strips API keys, tokens, private keys, and emails before storage.
 
+## How it works (and how it helps Claude)
+
+Every Claude Code session becomes a loop that gets smarter over time. You do nothing
+special — just work in a project directory and talk to Claude normally.
+
+```mermaid
+flowchart TD
+    A["You open Claude in a project dir"] --> B["SessionStart hook injects<br/>this project's core learnings"]
+    B --> C["You ask Claude to do something"]
+    C --> D{"Non-trivial?"}
+    D -- yes --> E["Claude searches learnings FIRST<br/>(MCP: search_learnings)"]
+    E --> F["Applies your past fixes,<br/>gotchas & conventions"]
+    D -- no --> F
+    F --> G["Claude proposes/runs a command"]
+    G --> H{"Risky? PreToolUse guard"}
+    H -- "destructive / prod" --> I["🔴 asks you to confirm"]
+    H -- safe --> J["runs it"]
+    I --> J
+    J --> K{"Solved something<br/>non-trivial?"}
+    K -- yes --> L["Claude offers to save it<br/>(dedup + secret-scrub)"]
+    L --> M[("local learnings.db<br/>workspace-isolated")]
+    M -. "loaded next session" .-> B
+    K -- no --> C
+```
+
+**Why this makes Claude more useful:**
+- **Starts with your context** — core facts (architecture, who-decides-what, your writing
+  style) are injected at session start, so Claude doesn't ramp up from zero every time.
+- **Stops re-solving** — it checks past learnings *before* acting, so a problem you cracked
+  once isn't rediscovered from scratch (or repeated as a mistake).
+- **Protects you** — the traffic-light rule + guard hook won't fire destructive/prod
+  commands without a confirm.
+- **Compounds** — every non-trivial fix can be saved, so the base gets better as you work,
+  and each project stays isolated from the others.
+
 ## Quickstart (per-machine, isolated)
 
 The common setup when you work across several projects: **each PC is its own self-contained install** with a
@@ -166,6 +201,32 @@ change shows up in Claude immediately.
 > Why not Docker? This is a single local SQLite file on your machine — the DB, MCP
 > server, and UI all run natively. A container would add moving parts for no benefit.
 > Docker only makes sense if you later promote this to a shared multi-user service.
+
+## Security & privacy
+
+The DB holds real infra knowledge, so the design keeps it local and minimises exposure:
+
+- **Owner-only files** — the DB is created `0600` and `~/.learnings/` `0700` automatically.
+- **Secret redaction on write** — API keys, tokens, private keys and emails are scrubbed
+  before anything is embedded or stored (`redact.py`).
+- **Per-machine isolation** — no cross-project data on a machine unless you put it there;
+  that's the confidentiality boundary between projects/clients.
+- **No secrets in the repo** — project-specific names/patterns live in machine-local files
+  (`~/.learnings/workspaces.txt`, `guard.json`), never in the code.
+- **LAN UI is token-gated** — any non-loopback bind auto-requires a token.
+
+**Encrypting the data — recommended approach:**
+- **Full-disk encryption is the right primary control** — LUKS (Linux), BitLocker
+  (Windows/WSL), FileVault (macOS). It protects the DB, backups, and everything else with
+  zero app complexity. If a machine holds client data, it should have this anyway.
+- **Encrypt anything that leaves the machine** — gpg/age a backup before copying it off, or
+  `git-crypt`/`age` a sync repo. That's where the real exposure is (a copy on untrusted
+  storage), not the local file on an encrypted disk.
+- **SQLite-level encryption (SQLCipher)** is possible but not built in: Python's stdlib
+  `sqlite3` doesn't support it, it needs `pysqlcipher3` + sqlite-vec compatibility work, and
+  it adds a key-management problem. For a single-user local tool on an encrypted disk the
+  marginal value is low — reach for it only if you have a specific threat model (e.g. the DB
+  file itself must be encrypted at rest independent of the disk).
 
 ## Configuration
 

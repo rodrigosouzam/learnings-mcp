@@ -86,7 +86,16 @@ class Store:
     def __init__(self, path: Path | None = None):
         self.path = path or _db_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Owner-only: the DB holds sensitive knowledge. Best-effort (no-op where unsupported).
+        try:
+            os.chmod(self.path.parent, 0o700)
+        except OSError:
+            pass
         self.db = sqlite3.connect(str(self.path))
+        try:
+            os.chmod(self.path, 0o600)
+        except OSError:
+            pass
         self.db.row_factory = sqlite3.Row
         self.db.enable_load_extension(True)
         sqlite_vec.load(self.db)
@@ -454,6 +463,17 @@ class Store:
             self.db.backup(out)
         finally:
             out.close()
+        try:
+            os.chmod(dest, 0o600)
+        except OSError:
+            pass
+        # Retention: keep the newest N backups (timestamped names sort chronologically).
+        keep = int(os.environ.get("LEARNINGS_BACKUP_KEEP", "10"))
+        for old in sorted(dest_dir.glob("learnings-*.db"))[:-keep]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
         return {"path": str(dest), "bytes": dest.stat().st_size}
 
     def verify(self, lid: str) -> dict | None:
