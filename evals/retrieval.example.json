@@ -1,0 +1,5 @@
+[
+  {"query": "how do I connect to the production database", "expect": "database access", "workspace": "project-a"},
+  {"query": "the deploy keeps timing out", "expect": "deploy timeout", "workspace": "project-a"},
+  {"query": "who approves infrastructure changes", "expect": "approvals", "workspace": "project-a"}
+]

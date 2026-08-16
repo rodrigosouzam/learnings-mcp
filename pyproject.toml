@@ -1,0 +1,22 @@
+[project]
+name = "learnings-mcp"
+version = "0.1.0"
+description = "Personal institutional-memory MCP server for Claude Code: local semantic search over your own learnings, backed by SQLite + sqlite-vec with on-device embeddings."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.2.0",
+    "sqlite-vec>=0.1.6",
+    "fastembed>=0.4.2",
+]
+
+[project.scripts]
+learnings-mcp = "learnings_mcp.server:main"
+learnings = "learnings_mcp.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["learnings_mcp"]

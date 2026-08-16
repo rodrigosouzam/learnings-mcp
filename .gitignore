@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.egg-info/
+*.pyc
+
+# local data — never commit the knowledge base or its backups/exports
+.learnings/
+*.db
+backups/
+session.json
+repo/
+
+# scratch / test artifacts
+.smoke/
+.smoke2/
+
+# your local eval cases (keep private)
+evals/retrieval.json
