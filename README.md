@@ -93,6 +93,42 @@ below — and not needed for the isolated setup.)
   FTS-indexed, or used in dedup — it's traceability only, so it can't skew search. It
   travels with git sync and shows in the UI (📎).
 
+## How the workspace is chosen
+
+**You never put anything inside your project directory** — the workspace is decided by
+the path or a pin, not by a marker file in the folder. Resolution order:
+
+1. an explicit `--workspace` / `workspace=` argument (CLI/tools)
+2. the **`LEARNINGS_WORKSPACE`** env var — a *pin*: every session uses this workspace
+   regardless of directory
+3. **directory auto-detect** — the first path segment under `$HOME`, if it's listed as a
+   known root (see below)
+4. otherwise `personal`
+
+Two clean setups — pick one per machine:
+
+**A. Pin the whole machine to one project** (simplest; a single-project laptop):
+```bash
+./bootstrap.sh "" myproject      # every session on this machine = workspace 'myproject'
+```
+Work in any directory — it's always `myproject`. Nothing else to do.
+
+**B. Decide the workspace by directory** (a machine with several projects):
+Don't pin; instead list which folders are workspaces in `~/.learnings/workspaces.txt`
+(one per line). A bare name means *folder name = workspace*; `folder=name` maps a folder
+to a differently-named workspace:
+```
+my-repo-dir=myproject        # working in ~/my-repo-dir → workspace 'myproject'
+webapp                       # working in ~/webapp      → workspace 'webapp'
+```
+Now `cd ~/my-repo-dir && claude` uses `myproject`; anywhere unlisted → `personal`.
+(You can also set `LEARNINGS_WORKSPACES=my-repo-dir=myproject,webapp` instead of the file.)
+
+> Switching a machine from a pin (A) to directory mode (B): re-register the MCP server
+> **without** `-e LEARNINGS_WORKSPACE=…` (`claude mcp remove learnings -s user` then
+> `claude mcp add …` without it), remove any `export LEARNINGS_WORKSPACE=…` from your
+> shell profile, and create `~/.learnings/workspaces.txt`.
+
 ## Search
 
 Search is **hybrid**: a vector KNN (semantic, via fastembed) and an SQLite **FTS5**

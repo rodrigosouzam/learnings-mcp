@@ -31,18 +31,34 @@ def _roots_file() -> Path:
     return parent / "workspaces.txt"
 
 
-def workspace_roots() -> set[str]:
+def _roots_map() -> dict:
+    """Map {directory-name-under-$HOME: workspace-name}. Each entry is either a bare
+    name (folder name == workspace) or 'folder=workspace' to map a directory to a
+    differently-named workspace (e.g. 'CloudAutomation=ansible'). Read from the
+    LEARNINGS_WORKSPACES env (comma-separated) or <db-dir>/workspaces.txt."""
+    entries = []
     env = os.environ.get("LEARNINGS_WORKSPACES")
     if env:
-        return {w.strip() for w in env.split(",") if w.strip()}
-    try:
-        f = _roots_file()
-        if f.exists():
-            return {w.strip() for line in f.read_text().splitlines()
-                    for w in line.split(",") if w.strip()}
-    except Exception:
-        pass
-    return set()
+        entries = env.split(",")
+    else:
+        try:
+            f = _roots_file()
+            if f.exists():
+                entries = [tok for line in f.read_text().splitlines() for tok in line.split(",")]
+        except Exception:
+            entries = []
+    m = {}
+    for e in entries:
+        e = e.strip()
+        if not e:
+            continue
+        seg, _, name = e.partition("=")
+        m[seg.strip()] = (name.strip() or seg.strip())
+    return m
+
+
+def workspace_roots() -> set[str]:  # kept for compatibility
+    return set(_roots_map().values())
 
 
 def normalize(name: str | None) -> str | None:
@@ -58,8 +74,7 @@ def _from_cwd() -> str | None:
         return None
     if not rel.parts:
         return None
-    first = rel.parts[0]
-    return first if first in workspace_roots() else None
+    return _roots_map().get(rel.parts[0])
 
 
 def resolve_workspace(explicit: str | None = None) -> str:
